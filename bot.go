@@ -13,21 +13,22 @@ import (
 
 type Bot struct {
 	bottom bottom.Bottom
-	dir    string
-	lists  map[string]*List
+	Lists  *Lists
 	tz     *time.Location
 }
 
 type handlerFunc func(groups [][]byte) error
 
-func New(user, password, server string, verify bool, dir, timezone string) (b Bot, err error) {
+func New(user, password, server string, verify bool, f, timezone string) (b Bot, err error) {
 	b.tz, err = time.LoadLocation(timezone)
 	if err != nil {
 		return
 	}
 
-	b.dir = dir
-	b.lists = make(map[string]*List)
+	b.Lists, err = LoadLists(f)
+	if err != nil {
+		return
+	}
 
 	b.bottom, err = bottom.New(user, password, server, verify)
 	if err != nil {
@@ -51,10 +52,13 @@ func New(user, password, server string, verify bool, dir, timezone string) (b Bo
 }
 
 func (b Bot) add(_, channel string, groups []string) (err error) {
-	list, ok := b.lists[channel]
+	b.Lists.Locker.Lock()
+	defer b.unlockAndSave()
+
+	list, ok := b.Lists.Items[channel]
 	if !ok {
 		list = NewList()
-		b.lists[channel] = list
+		b.Lists.Items[channel] = list
 	}
 
 	list.Create(groups[1])
@@ -63,6 +67,9 @@ func (b Bot) add(_, channel string, groups []string) (err error) {
 }
 
 func (b Bot) edit(_, channel string, groups []string) (err error) {
+	b.Lists.Locker.Lock()
+	defer b.unlockAndSave()
+
 	l, i, err := b.getListAndId(channel, groups[1])
 	if err != nil {
 		return
@@ -74,6 +81,9 @@ func (b Bot) edit(_, channel string, groups []string) (err error) {
 }
 
 func (b Bot) mark(_, channel string, groups []string) (err error) {
+	b.Lists.Locker.Lock()
+	defer b.Lists.Locker.Unlock()
+
 	l, i, err := b.getListAndId(channel, groups[1])
 	if err != nil {
 		return
@@ -85,6 +95,9 @@ func (b Bot) mark(_, channel string, groups []string) (err error) {
 }
 
 func (b Bot) delete(_, channel string, groups []string) (err error) {
+	b.Lists.Locker.Lock()
+	defer b.unlockAndSave()
+
 	l, i, err := b.getListAndId(channel, groups[1])
 	if err != nil {
 		return
@@ -125,8 +138,17 @@ func (b Bot) show(_, channel string, groups []string) (err error) {
 	return
 }
 
+func (b Bot) unlockAndSave() (err error) {
+	// Unlock always, even if saving fails
+	// - it's better to have a todo list that doesn't save, than have everything
+	//   fail totally
+	defer b.Lists.Locker.Unlock()
+
+	return b.Lists.Save()
+}
+
 func (b Bot) getListAndId(channel, id string) (l *List, idInt int, err error) {
-	l, ok := b.lists[channel]
+	l, ok := b.Lists.Items[channel]
 	if !ok {
 		err = fmt.Errorf("there is no todo list registered for %q, try adding one", channel)
 

@@ -1,6 +1,57 @@
 package main
 
-import "time"
+import (
+	"bytes"
+	"encoding/gob"
+	"os"
+	"sync"
+	"time"
+)
+
+type Lists struct {
+	Items  map[string]*List
+	Locker sync.Mutex
+
+	// f is a cache for the loadpath; it will not
+	// persist, but is useful for saving to disk
+	// (so *Lists.Save() knows where to put files)
+	f string
+}
+
+func LoadLists(f string) (l *Lists, err error) {
+	file, err := os.ReadFile(f)
+	if err != nil {
+		if os.IsNotExist(err) {
+			l = &Lists{
+				Items:  make(map[string]*List),
+				Locker: sync.Mutex{},
+			}
+			err = nil
+		}
+		return
+	}
+
+	b := bytes.NewBuffer(file)
+	dec := gob.NewDecoder(b)
+
+	err = dec.Decode(l)
+
+	l.f = f // do this last
+
+	return
+}
+
+func (l *Lists) Save() (err error) {
+	b := bytes.Buffer{}
+	dec := gob.NewEncoder(&b)
+
+	err = dec.Encode(l)
+	if err != nil {
+		return
+	}
+
+	return os.WriteFile(l.f, b.Bytes(), 0600)
+}
 
 type List struct {
 	Items []*Item

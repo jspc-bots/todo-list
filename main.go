@@ -10,16 +10,16 @@ const (
 )
 
 var (
-	Username   = os.Getenv("SASL_USER")
-	Password   = os.Getenv("SASL_PASSWORD")
-	Server     = os.Getenv("SERVER")
-	VerifyTLS  = os.Getenv("VERIFY_TLS") == "true"
-	StorageDir = os.Getenv("STORAGE_DIR")
-	Timezone   = os.Getenv("TZ")
+	Username    = os.Getenv("SASL_USER")
+	Password    = os.Getenv("SASL_PASSWORD")
+	Server      = os.Getenv("SERVER")
+	VerifyTLS   = os.Getenv("VERIFY_TLS") == "true"
+	StorageFile = os.Getenv("STORAGE_FILE")
+	Timezone    = os.Getenv("TZ")
 )
 
 func main() {
-	c, err := New(Username, Password, Server, VerifyTLS, StorageDir, Timezone)
+	c, err := New(Username, Password, Server, VerifyTLS, StorageFile, Timezone)
 	if err != nil {
 		panic(err)
 	}
