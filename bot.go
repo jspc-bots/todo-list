@@ -133,9 +133,9 @@ func (b Bot) show(_, channel string, groups []string) (err error) {
 
 	for _, item := range l.Items {
 		if item.Done {
-			b.bottom.Client.Cmd.Messagef(channel, "%d    ☑️  %s    (%s)", item.ID, rpad(item.Title, widest), item.MarkedDone.In(b.tz).Format(tfmt))
+			b.bottom.Client.Cmd.Messagef(channel, "%4d    ☑️  %s    (%s)", item.ID, rpad(item.Title, widest), item.MarkedDone.In(b.tz).Format(tfmt))
 		} else {
-			b.bottom.Client.Cmd.Messagef(channel, "%d    🚫 %s    (%s)", item.ID, rpad(item.Title, widest), item.CreatedAt.In(b.tz).Format(tfmt))
+			b.bottom.Client.Cmd.Messagef(channel, "%4d    🚫 %s    (%s)", item.ID, rpad(item.Title, widest), item.CreatedAt.In(b.tz).Format(tfmt))
 		}
 	}
 
