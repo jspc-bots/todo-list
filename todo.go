@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/gob"
+	"log"
 	"os"
 	"sync"
 	"time"
@@ -10,7 +11,7 @@ import (
 
 type Lists struct {
 	Items  map[string]*List
-	Locker sync.Mutex
+	locker sync.Mutex
 
 	// f is a cache for the loadpath; it will not
 	// persist, but is useful for saving to disk
@@ -19,13 +20,13 @@ type Lists struct {
 }
 
 func LoadLists(f string) (l *Lists, err error) {
+	l = new(Lists)
+	l.f = f
+
 	file, err := os.ReadFile(f)
 	if err != nil {
 		if os.IsNotExist(err) {
-			l = &Lists{
-				Items:  make(map[string]*List),
-				Locker: sync.Mutex{},
-			}
+			l.Items = make(map[string]*List)
 			err = nil
 		}
 		return
@@ -36,12 +37,16 @@ func LoadLists(f string) (l *Lists, err error) {
 
 	err = dec.Decode(l)
 
-	l.f = f // do this last
-
 	return
 }
 
 func (l *Lists) Save() (err error) {
+	defer func() {
+		if err != nil {
+			log.Print(err.Error())
+		}
+	}()
+
 	b := bytes.Buffer{}
 	dec := gob.NewEncoder(&b)
 
@@ -99,8 +104,6 @@ func (l *List) Finish(id int) {
 
 	l.Items[id].Done = true
 	l.Items[id].MarkedDone = time.Now()
-
-	return
 }
 
 func (l *List) Delete(id int) {
@@ -108,7 +111,16 @@ func (l *List) Delete(id int) {
 		return
 	}
 
-	l.Items = append(l.Items[:id], l.Items[id:]...)
+	if len(l.Items) < 2 {
+		l.Items = make([]*Item, 0)
+
+		return
+	}
+
+	// This method will get slower as more todo items exist
+	// we should revist this then (or add a delete-range option
+	// to the bot)
+	l.Items = append(l.Items[:id], l.Items[id+1:]...)
 
 	for idx, item := range l.Items {
 		item.ID = idx

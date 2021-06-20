@@ -3,12 +3,14 @@ package main
 import (
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/jspc/bottom"
 	"github.com/lrstanley/girc"
-	"github.com/olekukonko/tablewriter"
+)
+
+var (
+	tfmt = "2006. 01. 02. 15:04"
 )
 
 type Bot struct {
@@ -43,16 +45,16 @@ func New(user, password, server string, verify bool, f, timezone string) (b Bot,
 	router.AddRoute(`todo\:\s+\"(.*)\"`, b.add)
 	router.AddRoute(`edit\s+todo\s+(\d+)\:\s+\"(.*)\"`, b.edit)
 	router.AddRoute(`mark\s+todo\s+(\d+)`, b.mark)
-	router.AddRoute(`delete\s+todo\s+(\d+)"`, b.delete)
-	router.AddRoute(`show\s+todo\s+list"`, b.show)
+	router.AddRoute(`delete\s+todo\s+(\d+)`, b.delete)
+	router.AddRoute(`show\s+todo\s+list`, b.show)
 
 	b.bottom.Middlewares.Push(router)
 
 	return
 }
 
-func (b Bot) add(_, channel string, groups []string) (err error) {
-	b.Lists.Locker.Lock()
+func (b Bot) add(u, channel string, groups []string) (err error) {
+	b.Lists.locker.Lock()
 	defer b.unlockAndSave()
 
 	list, ok := b.Lists.Items[channel]
@@ -63,11 +65,13 @@ func (b Bot) add(_, channel string, groups []string) (err error) {
 
 	list.Create(groups[1])
 
+	b.bottom.Client.Cmd.Messagef(u, "added %q to %s todo list", groups[1], channel)
+
 	return
 }
 
 func (b Bot) edit(_, channel string, groups []string) (err error) {
-	b.Lists.Locker.Lock()
+	b.Lists.locker.Lock()
 	defer b.unlockAndSave()
 
 	l, i, err := b.getListAndId(channel, groups[1])
@@ -81,8 +85,8 @@ func (b Bot) edit(_, channel string, groups []string) (err error) {
 }
 
 func (b Bot) mark(_, channel string, groups []string) (err error) {
-	b.Lists.Locker.Lock()
-	defer b.Lists.Locker.Unlock()
+	b.Lists.locker.Lock()
+	defer b.unlockAndSave()
 
 	l, i, err := b.getListAndId(channel, groups[1])
 	if err != nil {
@@ -95,7 +99,7 @@ func (b Bot) mark(_, channel string, groups []string) (err error) {
 }
 
 func (b Bot) delete(_, channel string, groups []string) (err error) {
-	b.Lists.Locker.Lock()
+	b.Lists.locker.Lock()
 	defer b.unlockAndSave()
 
 	l, i, err := b.getListAndId(channel, groups[1])
@@ -114,25 +118,13 @@ func (b Bot) show(_, channel string, groups []string) (err error) {
 		return
 	}
 
-	sb := strings.Builder{}
-
-	table := tablewriter.NewWriter(&sb)
-	table.SetHeader([]string{"", "Item", "Date"})
-
+	b.bottom.Client.Cmd.Messagef(channel, "%s todo list", channel)
 	for _, item := range l.Items {
 		if item.Done {
-			table.Append([]string{"☑️", item.Title, item.MarkedDone.In(b.tz).String()})
+			b.bottom.Client.Cmd.Messagef(channel, "%d    ☑️  %s    (%s)", item.ID, item.Title, item.MarkedDone.In(b.tz).Format(tfmt))
 		} else {
-			table.Append([]string{"", item.Title, item.CreatedAt.In(b.tz).String()})
+			b.bottom.Client.Cmd.Messagef(channel, "%d    🚫 %s    (%s)", item.ID, item.Title, item.CreatedAt.In(b.tz).Format(tfmt))
 		}
-	}
-
-	table.Render()
-
-	b.bottom.Client.Cmd.Messagef(channel, "%s todo list", channel)
-
-	for _, line := range strings.Split(sb.String(), "\n") {
-		b.bottom.Client.Cmd.Message(channel, line)
 	}
 
 	return
@@ -142,7 +134,7 @@ func (b Bot) unlockAndSave() (err error) {
 	// Unlock always, even if saving fails
 	// - it's better to have a todo list that doesn't save, than have everything
 	//   fail totally
-	defer b.Lists.Locker.Unlock()
+	defer b.Lists.locker.Unlock()
 
 	return b.Lists.Save()
 }
@@ -150,7 +142,7 @@ func (b Bot) unlockAndSave() (err error) {
 func (b Bot) getListAndId(channel, id string) (l *List, idInt int, err error) {
 	l, ok := b.Lists.Items[channel]
 	if !ok {
-		err = fmt.Errorf("there is no todo list registered for %q, try adding one", channel)
+		err = fmt.Errorf("there is no todo list registered for %q, add a todo item to create it", channel)
 
 		return
 	}

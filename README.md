@@ -11,4 +11,4 @@ It works with the following environment variables:
 * `$SERVER` - IRC connection details, as `irc://server:6667` or `ircs://server:6697` (`ircs` implies irc-over-tls)
 * `$VERIFY_TLS` - Verify TLS, or sack it off. This is of interest to people, like me, running an ircd on localhost with a self-signed cert. Matches "true" as true, and anything else as false
 * `$STORAGE_FILE` - File to persist stored todos in. If it does not exist, the file will be created when the first item is added
-* `TZ` - Timezone to render todo items with
+* `$TZ` - Timezone to render todo items with
