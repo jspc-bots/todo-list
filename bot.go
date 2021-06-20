@@ -9,8 +9,9 @@ import (
 	"github.com/lrstanley/girc"
 )
 
-var (
-	tfmt = "2006. 01. 02. 15:04"
+const (
+	tfmt     = "2006. 01. 02. 15:04"
+	maxWidth = 64
 )
 
 type Bot struct {
@@ -118,12 +119,23 @@ func (b Bot) show(_, channel string, groups []string) (err error) {
 		return
 	}
 
-	b.bottom.Client.Cmd.Messagef(channel, "%s todo list", channel)
+	b.bottom.Client.Cmd.Messagef(channel, "%s's todo list", channel)
+	widest := 0
+	for _, i := range l.Items {
+		if len(i.Title) > widest {
+			widest = len(i.Title)
+		}
+	}
+
+	if widest > maxWidth {
+		widest = maxWidth
+	}
+
 	for _, item := range l.Items {
 		if item.Done {
-			b.bottom.Client.Cmd.Messagef(channel, "%d    ☑️  %s    (%s)", item.ID, item.Title, item.MarkedDone.In(b.tz).Format(tfmt))
+			b.bottom.Client.Cmd.Messagef(channel, "%d    ☑️  %s    (%s)", item.ID, rpad(item.Title, widest), item.MarkedDone.In(b.tz).Format(tfmt))
 		} else {
-			b.bottom.Client.Cmd.Messagef(channel, "%d    🚫 %s    (%s)", item.ID, item.Title, item.CreatedAt.In(b.tz).Format(tfmt))
+			b.bottom.Client.Cmd.Messagef(channel, "%d    🚫 %s    (%s)", item.ID, rpad(item.Title, widest), item.CreatedAt.In(b.tz).Format(tfmt))
 		}
 	}
 
@@ -150,4 +162,16 @@ func (b Bot) getListAndId(channel, id string) (l *List, idInt int, err error) {
 	idInt, err = strconv.Atoi(id)
 
 	return
+}
+
+func rpad(s string, widest int) string {
+	if len(s) == widest {
+		return s
+	}
+
+	if len(s) >= (widest - 3) {
+		return fmt.Sprintf("%s...", string(s[:widest-3]))
+	}
+
+	return fmt.Sprintf("%-*s", widest, s)
 }
