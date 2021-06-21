@@ -44,10 +44,11 @@ func New(user, password, server string, verify bool, f, timezone string) (b Bot,
 
 	router := bottom.NewRouter()
 	router.AddRoute(`todo\:\s+\"(.*)\"`, b.add)
-	router.AddRoute(`edit\s+todo\s+(\d+)\:\s+\"(.*)\"`, b.edit)
+	router.AddRoute(`edit\s+todo\s+(\d+)\s+\"(.*)\"`, b.edit)
 	router.AddRoute(`mark\s+todo\s+(\d+)`, b.mark)
 	router.AddRoute(`delete\s+todo\s+(\d+)`, b.delete)
 	router.AddRoute(`show\s+todo\s+list`, b.show)
+	router.AddRoute(`get\s+todo\s+(\d+)`, b.get)
 
 	b.bottom.Middlewares.Push(router)
 
@@ -138,6 +139,22 @@ func (b Bot) show(_, channel string, groups []string) (err error) {
 			b.bottom.Client.Cmd.Messagef(channel, "%4d    🚫 %s    (%s)", item.ID, rpad(item.Title, widest), item.CreatedAt.In(b.tz).Format(tfmt))
 		}
 	}
+
+	return
+}
+
+func (b Bot) get(_, channel string, groups []string) (err error) {
+	l, i, err := b.getListAndId(channel, groups[1])
+	if err != nil {
+		return
+	}
+
+	item := l.Read(i)
+	if item == nil {
+		return
+	}
+
+	b.bottom.Client.Cmd.Message(channel, item.Title)
 
 	return
 }

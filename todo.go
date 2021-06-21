@@ -89,6 +89,14 @@ func (l *List) Create(title string) (i *Item) {
 	return
 }
 
+func (l *List) Read(id int) (i *Item) {
+	if id >= len(l.Items) {
+		return
+	}
+
+	return l.Items[id]
+}
+
 func (l *List) Update(id int, title string) {
 	if id >= len(l.Items) {
 		return
